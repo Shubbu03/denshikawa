@@ -1,0 +1,17 @@
+{
+  "name": "api-runner",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "scripts": {
+    "dev": "cd ../../apps/api && cargo run",
+    "build": "cd ../../apps/api && cargo build",
+    "test": "cd ../../apps/api && cargo test"
+  }
+}
