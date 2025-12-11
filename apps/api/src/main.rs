@@ -7,11 +7,8 @@ mod http;
 mod db;
 
 use crate::{config::AppConfig, http::build_router};
-
-#[derive(Clone)]
-pub struct AppState {
-    pub db_pool: sqlx::PgPool,
-}
+mod state;
+pub use state::AppState;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -36,6 +33,16 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("Connecting to database...");
     let pool = db::create_pool(&config).await?;
     tracing::info!("Database connection established");
+
+    // 4b. Run migrations (configurable)
+    let run_migrations = std::env::var("RUN_MIGRATIONS_ON_STARTUP")
+        .map(|v| v != "0" && v.to_lowercase() != "false")
+        .unwrap_or(true);
+    if run_migrations {
+        tracing::info!("Running database migrations...");
+        sqlx::migrate!().run(&pool).await?;
+        tracing::info!("Migrations applied");
+    }
 
     // 5. App state
     let state = AppState { db_pool: pool };
