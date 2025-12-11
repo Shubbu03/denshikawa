@@ -39,7 +39,6 @@ async fn main() -> anyhow::Result<()> {
 
     // 5. App state
     let state = AppState { db_pool: pool };
-    tracing::info!("Starting API server on {}", addr);
 
     // 6. Build HTTP router
     let app = build_router(&config, state.clone());

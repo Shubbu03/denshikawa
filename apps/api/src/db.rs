@@ -15,9 +15,15 @@ pub async fn create_pool(config: &AppConfig) -> Result<PgPool> {
         .and_then(|s| s.parse().ok())
         .unwrap_or(15);
 
+    let idle_timeout_secs: u64 = std::env::var("DB_IDLE_TIMEOUT_SECS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(600);
+
     let pool = PgPoolOptions::new()
         .max_connections(max_connections)
-        .idle_timeout(Duration::from_secs(connect_timeout_secs))
+        .acquire_timeout(Duration::from_secs(connect_timeout_secs))
+        .idle_timeout(Duration::from_secs(idle_timeout_secs))
         .connect(&config.database_url)
         .await
         .context("Failed to connect to Postgres")?;
