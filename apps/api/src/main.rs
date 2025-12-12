@@ -2,6 +2,7 @@ use tracing::{Level};
 use tracing_subscriber::{FmtSubscriber};
 
 use std::net::SocketAddr;
+mod auth;
 mod config;
 mod http;
 mod db;
@@ -45,14 +46,20 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // 5. App state
-    let state = AppState { db_pool: pool };
+    let state = AppState {
+        db_pool: pool,
+        auth_config: config.auth.clone(),
+    };
 
     // 6. Build HTTP router
     let app = build_router(&config, state.clone());
 
     // 7. Bind TCP listener and serve
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    axum::serve(listener, app).await?;
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>()
+    ).await?;
 
     Ok(())
 }
