@@ -1,11 +1,14 @@
 use tracing::{Level};
 use tracing_subscriber::{FmtSubscriber};
+use anyhow::Context;
 
 use std::net::SocketAddr;
 mod auth;
 mod config;
 mod http;
 mod db;
+mod mangadex;
+mod manga;
 
 use crate::{config::AppConfig, http::build_router};
 mod state;
@@ -45,16 +48,25 @@ async fn main() -> anyhow::Result<()> {
         tracing::info!("Migrations applied");
     }
 
-    // 5. App state
+    // 5. Initialize MangaDex client
+    tracing::info!("Initializing MangaDex client...");
+    let mangadex_client = crate::mangadex::MangaDexClient::new(&config.mangadex)
+        .context("Failed to create MangaDex client")?;
+    let mangadex_client = std::sync::Arc::new(mangadex_client);
+    tracing::info!("MangaDex client initialized");
+
+    // 6. App state
     let state = AppState {
         db_pool: pool,
         auth_config: config.auth.clone(),
+        mangadex_client,
+        mangadex_config: config.mangadex.clone(),
     };
 
-    // 6. Build HTTP router
+    // 7. Build HTTP router
     let app = build_router(&config, state.clone());
 
-    // 7. Bind TCP listener and serve
+    // 8. Bind TCP listener and serve
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(
         listener,

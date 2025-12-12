@@ -6,6 +6,7 @@ pub struct AppConfig {
     pub port: u16,
     pub database_url: String,
     pub auth: AuthConfig,
+    pub mangadex: MangaDexConfig,
 }
 
 #[derive(Clone)]
@@ -75,12 +76,51 @@ impl AppConfig {
         let database_url = env::var("DATABASE_URL").context("DATABASE_URL must be set")?;
 
         let auth = AuthConfig::from_env()?;
+        let mangadex = MangaDexConfig::from_env()?;
 
         Ok(Self {
             host,
             port,
             database_url,
             auth,
+            mangadex,
+        })
+    }
+}
+
+#[derive(Clone)]
+pub struct MangaDexConfig {
+    pub base_url: String,
+    pub rate_limit_per_sec: u32,
+    pub cache_manga_ttl_hours: i64,
+    pub cache_chapter_ttl_hours: i64,
+}
+
+impl MangaDexConfig {
+    pub fn from_env() -> Result<Self> {
+        let base_url = env::var("MANGADEX_BASE_URL")
+            .unwrap_or_else(|_| "https://api.mangadex.org".to_string());
+
+        let rate_limit_per_sec = env::var("MANGADEX_RATE_LIMIT_PER_SEC")
+            .unwrap_or_else(|_| "5".to_string())
+            .parse::<u32>()
+            .context("MANGADEX_RATE_LIMIT_PER_SEC must be a valid u32")?;
+
+        let cache_manga_ttl_hours = env::var("CACHE_MANGA_TTL_HOURS")
+            .unwrap_or_else(|_| "24".to_string())
+            .parse::<i64>()
+            .context("CACHE_MANGA_TTL_HOURS must be a valid i64")?;
+
+        let cache_chapter_ttl_hours = env::var("CACHE_CHAPTER_TTL_HOURS")
+            .unwrap_or_else(|_| "6".to_string())
+            .parse::<i64>()
+            .context("CACHE_CHAPTER_TTL_HOURS must be a valid i64")?;
+
+        Ok(Self {
+            base_url,
+            rate_limit_per_sec,
+            cache_manga_ttl_hours,
+            cache_chapter_ttl_hours,
         })
     }
 }
