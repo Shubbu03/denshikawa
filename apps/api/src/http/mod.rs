@@ -1,14 +1,25 @@
 use axum::{
+    http::{header, Method},
     routing::{delete, get, post, put},
     Router,
 };
-use tower_http::trace::TraceLayer;
+use tower_http::{
+    cors::CorsLayer,
+    trace::TraceLayer,
+};
 
 use crate::{config::AppConfig, AppState};
 
 pub mod routes;
 
 pub fn build_router(config: &AppConfig, state: AppState) -> Router {
+    // CORS configuration for frontend (localhost:3000)
+    let cors = CorsLayer::new()
+        .allow_origin("http://localhost:3000".parse::<axum::http::HeaderValue>().unwrap())
+        .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE, Method::OPTIONS])
+        .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION, header::ACCEPT])
+        .allow_credentials(true);
+
     Router::new()
         .route("/health", get(routes::health::ping))
         .route("/users/{id}", get(routes::get_user_by_id::get_user_by_id))
@@ -58,5 +69,6 @@ pub fn build_router(config: &AppConfig, state: AppState) -> Router {
             delete(routes::users::history::remove_from_history),
         )
         .with_state(state)
+        .layer(cors)
         .layer(TraceLayer::new_for_http())
 }
