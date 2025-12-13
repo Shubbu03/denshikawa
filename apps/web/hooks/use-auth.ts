@@ -1,15 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
 import { authApi, userApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth-store';
+import { useAuthModalStore } from '@/stores/auth-modal-store';
 import { queryKeys } from '@/lib/api/query-keys';
 import { LoginRequest, RegisterRequest } from '@/lib/schemas/auth';
 import { toast } from 'sonner';
 
 export const useAuth = () => {
-    const router = useRouter();
     const queryClient = useQueryClient();
     const { user, isAuthenticated, login: setAuthState, logout: clearAuthState } = useAuthStore();
+    const { close: closeAuthModal } = useAuthModalStore();
 
     const loginMutation = useMutation({
         mutationFn: (credentials: LoginRequest) => authApi.login(credentials),
@@ -20,8 +20,8 @@ export const useAuth = () => {
                 data.tokens.refresh_token
             );
             queryClient.setQueryData(queryKeys.user.me(), data.user);
+            closeAuthModal();
             toast.success('Welcome back!');
-            router.push('/');
         },
         onError: (error: any) => {
             const message = error.response?.data?.message || 'Login failed. Please try again.';
@@ -38,8 +38,8 @@ export const useAuth = () => {
                 data.tokens.refresh_token
             );
             queryClient.setQueryData(queryKeys.user.me(), data.user);
+            closeAuthModal();
             toast.success('Account created successfully!');
-            router.push('/');
         },
         onError: (error: any) => {
             const message = error.response?.data?.message || 'Registration failed. Please try again.';
@@ -53,12 +53,10 @@ export const useAuth = () => {
             clearAuthState();
             queryClient.clear();
             toast.success('Logged out successfully');
-            router.push('/login');
         },
         onError: () => {
             clearAuthState();
             queryClient.clear();
-            router.push('/login');
         },
     });
 

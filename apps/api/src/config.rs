@@ -94,6 +94,10 @@ pub struct MangaDexConfig {
     pub rate_limit_per_sec: u32,
     pub cache_manga_ttl_hours: i64,
     pub cache_chapter_ttl_hours: i64,
+    pub username: Option<String>,
+    pub password: Option<String>,
+    pub client_id: Option<String>,
+    pub client_secret: Option<String>,
 }
 
 impl MangaDexConfig {
@@ -121,6 +125,10 @@ impl MangaDexConfig {
             rate_limit_per_sec,
             cache_manga_ttl_hours,
             cache_chapter_ttl_hours,
+            username: env::var("MANGADEX_USERNAME").ok(),
+            password: env::var("MANGADEX_PASSWORD").ok(),
+            client_id: env::var("MANGADEX_CLIENT_ID").ok(),
+            client_secret: env::var("MANGADEX_CLIENT_SECRET").ok(),
         })
     }
 }

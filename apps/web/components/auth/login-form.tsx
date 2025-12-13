@@ -2,7 +2,6 @@
 
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -15,10 +14,12 @@ import {
 } from '@/components/ui/form';
 import { loginRequestSchema, type LoginRequest } from '@/lib/schemas/auth';
 import { useAuth } from '@/hooks/use-auth';
+import { useAuthModalStore } from '@/stores/auth-modal-store';
 import { Loader2 } from 'lucide-react';
 
 export function LoginForm() {
     const { login, isLoggingIn } = useAuth();
+    const { setTab } = useAuthModalStore();
 
     const form = useForm<LoginRequest>({
         resolver: zodResolver(loginRequestSchema),
@@ -86,9 +87,13 @@ export function LoginForm() {
 
                 <div className="text-center text-sm text-muted-foreground">
                     Don't have an account?{' '}
-                    <Link href="/register" className="text-primary hover:underline">
+                    <button
+                        type="button"
+                        onClick={() => setTab('register')}
+                        className="text-primary hover:underline"
+                    >
                         Sign up
-                    </Link>
+                    </button>
                 </div>
             </form>
         </Form>

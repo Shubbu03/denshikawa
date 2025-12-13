@@ -3,11 +3,19 @@ use governor::{Quota, RateLimiter};
 use reqwest::Client;
 use std::num::NonZeroU32;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
+use tokio::sync::Mutex;
 
 use crate::config::MangaDexConfig;
 use crate::mangadex::error::MangaDexError;
 use crate::mangadex::types::*;
+
+#[derive(Clone)]
+struct TokenPair {
+    access_token: String,
+    refresh_token: String,
+    expires_at: Instant,
+}
 
 pub struct MangaDexClient {
     http: Client,
@@ -19,6 +27,9 @@ pub struct MangaDexClient {
         >,
     >,
     base_url: String,
+    auth_url: String,
+    tokens: Arc<Mutex<Option<TokenPair>>>,
+    config: MangaDexConfig,
 }
 
 impl MangaDexClient {
@@ -40,7 +51,151 @@ impl MangaDexClient {
             http,
             rate_limiter,
             base_url: config.base_url.clone(),
+            auth_url: "https://auth.mangadex.org/realms/mangadex/protocol/openid-connect/token".to_string(),
+            tokens: Arc::new(Mutex::new(None)),
+            config: config.clone(),
         })
+    }
+
+    async fn authenticate(&self) -> Result<(), MangaDexError> {
+        let username = self.config.username.as_ref()
+            .ok_or_else(|| MangaDexError::ApiError("MANGADEX_USERNAME not set".to_string()))?;
+        let password = self.config.password.as_ref()
+            .ok_or_else(|| MangaDexError::ApiError("MANGADEX_PASSWORD not set".to_string()))?;
+        let client_id = self.config.client_id.as_ref()
+            .ok_or_else(|| MangaDexError::ApiError("MANGADEX_CLIENT_ID not set".to_string()))?;
+        let client_secret = self.config.client_secret.as_ref()
+            .ok_or_else(|| MangaDexError::ApiError("MANGADEX_CLIENT_SECRET not set".to_string()))?;
+
+        let form_data = [
+            ("grant_type", "password"),
+            ("username", username),
+            ("password", password),
+            ("client_id", client_id),
+            ("client_secret", client_secret),
+        ];
+
+        let response = self.http
+            .post(&self.auth_url)
+            .header(
+                "User-Agent",
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            )
+            .form(&form_data)
+            .send()
+            .await
+            .map_err(|e| MangaDexError::NetworkError(e))?;
+
+        let status = response.status();
+        if !status.is_success() {
+            let text = response.text().await.unwrap_or_default();
+            return Err(MangaDexError::ApiError(format!("Authentication failed: HTTP {} - {}", status, text)));
+        }
+
+        #[derive(serde::Deserialize)]
+        struct AuthResponse {
+            access_token: String,
+            refresh_token: String,
+        }
+
+        let auth: AuthResponse = response.json().await
+            .map_err(|_| MangaDexError::InvalidResponse)?;
+
+        let tokens = TokenPair {
+            access_token: auth.access_token,
+            refresh_token: auth.refresh_token,
+            expires_at: Instant::now() + Duration::from_secs(14 * 60),
+        };
+
+        *self.tokens.lock().await = Some(tokens);
+        Ok(())
+    }
+
+    async fn refresh_token(&self) -> Result<(), MangaDexError> {
+        let refresh_token = {
+            let tokens = self.tokens.lock().await;
+            tokens.as_ref()
+                .map(|t| t.refresh_token.clone())
+                .ok_or_else(|| MangaDexError::ApiError("No refresh token available".to_string()))?
+        };
+
+        let client_id = self.config.client_id.as_ref()
+            .ok_or_else(|| MangaDexError::ApiError("MANGADEX_CLIENT_ID not set".to_string()))?;
+        let client_secret = self.config.client_secret.as_ref()
+            .ok_or_else(|| MangaDexError::ApiError("MANGADEX_CLIENT_SECRET not set".to_string()))?;
+
+        let form_data = [
+            ("grant_type", "refresh_token"),
+            ("refresh_token", &refresh_token),
+            ("client_id", client_id),
+            ("client_secret", client_secret),
+        ];
+
+        let response = self.http
+            .post(&self.auth_url)
+            .header(
+                "User-Agent",
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            )
+            .form(&form_data)
+            .send()
+            .await
+            .map_err(|e| MangaDexError::NetworkError(e))?;
+
+        let status = response.status();
+        if !status.is_success() {
+            let _text = response.text().await.unwrap_or_default();
+            *self.tokens.lock().await = None;
+            return self.authenticate().await;
+        }
+
+        #[derive(serde::Deserialize)]
+        struct RefreshResponse {
+            access_token: String,
+            #[serde(default)]
+            refresh_token: Option<String>,
+        }
+
+        let refresh: RefreshResponse = response.json().await
+            .map_err(|_| MangaDexError::InvalidResponse)?;
+
+        let mut tokens = self.tokens.lock().await;
+        if let Some(existing) = tokens.as_mut() {
+            existing.access_token = refresh.access_token;
+            existing.expires_at = Instant::now() + Duration::from_secs(14 * 60);
+            if let Some(new_refresh) = refresh.refresh_token {
+                existing.refresh_token = new_refresh;
+            }
+        } else {
+            return Err(MangaDexError::ApiError("Token state inconsistent".to_string()));
+        }
+
+        Ok(())
+    }
+
+    async fn ensure_authenticated(&self) -> Result<(), MangaDexError> {
+        if self.config.username.is_none() || self.config.password.is_none() 
+            || self.config.client_id.is_none() || self.config.client_secret.is_none() {
+            return Ok(());
+        }
+
+        let needs_auth = {
+            let tokens = self.tokens.lock().await;
+            tokens.is_none() || tokens.as_ref().unwrap().expires_at <= Instant::now()
+        };
+
+        if needs_auth {
+            let tokens = self.tokens.lock().await;
+            if tokens.is_none() {
+                drop(tokens);
+                self.authenticate().await?;
+            } else {
+                drop(tokens);
+                self.refresh_token().await?;
+            }
+        }
+
+        Ok(())
     }
 
     async fn request_with_retry<F, Fut, T>(&self, mut op: F) -> Result<T, MangaDexError>
@@ -64,20 +219,24 @@ impl MangaDexClient {
                 Err(backoff::Error::Permanent(err)) => return Err(err),
                 Err(backoff::Error::Transient {
                     err,
-                    retry_after: _,
+                    retry_after,
                 }) => {
                     if let Some(max_time) = backoff_config.max_elapsed_time {
                         if start.elapsed() >= max_time {
                             return Err(err);
                         }
                     }
-                    // Calculate exponential backoff delay
-                    let base_delay = backoff_config.initial_interval.as_millis() as u64;
-                    let delay_ms =
-                        (base_delay as f64 * backoff_config.multiplier.powi(attempt as i32)) as u64;
-                    let delay = Duration::from_millis(
-                        delay_ms.min(backoff_config.max_interval.as_millis() as u64),
-                    );
+                    
+                    let delay = if let Some(retry_duration) = retry_after {
+                        retry_duration
+                    } else {
+                        let base_delay = backoff_config.initial_interval.as_millis() as u64;
+                        let delay_ms =
+                            (base_delay as f64 * backoff_config.multiplier.powi(attempt as i32)) as u64;
+                        Duration::from_millis(
+                            delay_ms.min(backoff_config.max_interval.as_millis() as u64),
+                        )
+                    };
                     attempt += 1;
                     tokio::time::sleep(delay).await;
                 }
@@ -89,14 +248,33 @@ impl MangaDexClient {
     where
         T: serde::de::DeserializeOwned,
     {
+        if let Err(e) = self.ensure_authenticated().await {
+            return Err(backoff::Error::Permanent(e));
+        }
+
         while self.rate_limiter.check().is_err() {
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
 
-        let response = self
+        let access_token = {
+            let tokens = self.tokens.lock().await;
+            tokens.as_ref().map(|t| t.access_token.clone())
+        };
+
+        let mut request = self
             .http
             .get(url)
-            .header("User-Agent", "Denshikawa/1.0")
+            .header(
+                "User-Agent",
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            )
+            .header("Accept", "application/json");
+
+        if let Some(token) = access_token {
+            request = request.header("Authorization", format!("Bearer {}", token));
+        }
+
+        let response = request
             .send()
             .await
             .map_err(|e| {
@@ -111,10 +289,33 @@ impl MangaDexClient {
             })?;
 
         let status = response.status();
+
+        if status == 401 {
+            if let Err(_) = self.refresh_token().await {
+                if let Err(_) = self.authenticate().await {
+                    return Err(backoff::Error::Transient {
+                        err: MangaDexError::ApiError("Authentication failed".to_string()),
+                        retry_after: Some(Duration::from_secs(5)),
+                    });
+                }
+            }
+            return Err(backoff::Error::Transient {
+                err: MangaDexError::ApiError("Token expired, retrying".to_string()),
+                retry_after: None,
+            });
+        }
+
         if status == 429 {
             return Err(backoff::Error::Transient {
                 err: MangaDexError::RateLimited,
                 retry_after: None,
+            });
+        }
+
+        if status == 403 {
+            return Err(backoff::Error::Transient {
+                err: MangaDexError::ApiError("Temporarily banned by MangaDex".to_string()),
+                retry_after: Some(Duration::from_secs(120)),
             });
         }
 
