@@ -48,10 +48,15 @@ export const useMangaDetails = (id: string) => {
 };
 
 export const useMangaChapters = (id: string, lang = 'en') => {
-    return useQuery({
+    return useInfiniteQuery({
         queryKey: queryKeys.manga.chapters(id, lang),
-        queryFn: () => mangaApi.getChapters(id, lang),
+        queryFn: ({ pageParam = 0 }) => mangaApi.getChapters(id, lang, 100, pageParam),
+        getNextPageParam: (lastPage) => {
+            const nextOffset = lastPage.offset + lastPage.limit;
+            return nextOffset < lastPage.total ? nextOffset : undefined;
+        },
         enabled: !!id,
+        initialPageParam: 0,
     });
 };
 

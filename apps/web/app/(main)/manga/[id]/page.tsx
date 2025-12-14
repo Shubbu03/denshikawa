@@ -1,6 +1,7 @@
 'use client';
 
 import { useParams } from 'next/navigation';
+import { useMemo } from 'react';
 import { useMangaDetails, useMangaChapters } from '@/hooks/use-manga';
 import { MangaCardSkeleton } from '@/components/manga/manga-card-skeleton';
 import { Button } from '@/components/ui/button';
@@ -19,7 +20,22 @@ export default function MangaDetailsPage() {
     const { isAuthenticated } = useAuth();
 
     const { data: manga, isLoading: isLoadingManga } = useMangaDetails(mangaId);
-    const { data: chapters, isLoading: isLoadingChapters } = useMangaChapters(mangaId, 'en');
+    const {
+        data: chaptersData,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage,
+        isLoading: isLoadingChapters,
+    } = useMangaChapters(mangaId, 'en');
+
+    const sortedChapters = useMemo(() => {
+        const allChapters = chaptersData?.pages.flatMap((page) => page.data) ?? [];
+        return [...allChapters].sort((a, b) => {
+            const numA = a.chapter_number ? parseFloat(a.chapter_number) : 0;
+            const numB = b.chapter_number ? parseFloat(b.chapter_number) : 0;
+            return numB - numA;
+        });
+    }, [chaptersData]);
 
     if (isLoadingManga) {
         return (
@@ -57,17 +73,9 @@ export default function MangaDetailsPage() {
         );
     }
 
-    const sortedChapters = [...(chapters || [])].sort((a, b) => {
-        const numA = a.chapter_number ? parseFloat(a.chapter_number) : 0;
-        const numB = b.chapter_number ? parseFloat(b.chapter_number) : 0;
-        return numB - numA;
-    });
-
     return (
         <div className="container mx-auto px-4 py-6 space-y-6">
-            {/* Header Section */}
             <div className="flex flex-col md:flex-row gap-6">
-                {/* Cover Image */}
                 <div className="w-full md:w-64 shrink-0">
                     <div className="aspect-3/4 relative overflow-hidden rounded-lg border bg-muted">
                         {manga.cover_url ? (
@@ -184,9 +192,12 @@ export default function MangaDetailsPage() {
             <div className="space-y-4">
                 <div className="flex items-center justify-between">
                     <h2 className="text-2xl font-semibold">Chapters</h2>
-                    {sortedChapters.length > 0 && (
+                    {chaptersData && sortedChapters.length > 0 && (
                         <p className="text-sm text-muted-foreground">
-                            {sortedChapters.length} chapter{sortedChapters.length !== 1 ? 's' : ''}
+                            {chaptersData.pages[0]?.total ?? sortedChapters.length} chapter{(chaptersData.pages[0]?.total ?? sortedChapters.length) !== 1 ? 's' : ''}
+                            {sortedChapters.length < (chaptersData.pages[0]?.total ?? 0) && (
+                                <span className="ml-1">({sortedChapters.length} loaded)</span>
+                            )}
                         </p>
                     )}
                 </div>
@@ -241,6 +252,31 @@ export default function MangaDetailsPage() {
                                 <BookOpen className="h-5 w-5 text-muted-foreground group-hover:text-foreground transition-colors shrink-0 ml-4" />
                             </Link>
                         ))}
+                        {isFetchingNextPage && (
+                            <div className="space-y-2">
+                                {Array.from({ length: 5 }).map((_, i) => (
+                                    <div key={`skeleton-${i}`} className="h-16 bg-muted rounded animate-pulse" />
+                                ))}
+                            </div>
+                        )}
+                        {hasNextPage && (
+                            <div className="flex justify-center pt-4">
+                                <Button
+                                    onClick={() => fetchNextPage()}
+                                    disabled={isFetchingNextPage}
+                                    variant="outline"
+                                >
+                                    {isFetchingNextPage ? (
+                                        <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Loading...
+                                        </>
+                                    ) : (
+                                        'Load More Chapters'
+                                    )}
+                                </Button>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

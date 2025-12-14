@@ -14,6 +14,13 @@ export const chapterSchema = z.object({
 
 export const chapterListSchema = z.array(chapterSchema);
 
+export const chapterListResponseSchema = z.object({
+    data: z.array(chapterSchema),
+    total: z.number(),
+    limit: z.number(),
+    offset: z.number(),
+});
+
 export const chapterPagesSchema = z.object({
     pages: z.array(
         z.object({
@@ -42,6 +49,7 @@ export const chapterNavigationSchema = z.object({
 
 export type Chapter = z.infer<typeof chapterSchema>;
 export type ChapterList = z.infer<typeof chapterListSchema>;
+export type ChapterListResponse = z.infer<typeof chapterListResponseSchema>;
 export type ChapterPages = z.infer<typeof chapterPagesSchema>;
 export type ChapterNavigation = z.infer<typeof chapterNavigationSchema>;
 
