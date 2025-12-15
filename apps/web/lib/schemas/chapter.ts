@@ -22,29 +22,23 @@ export const chapterListResponseSchema = z.object({
 });
 
 export const chapterPagesSchema = z.object({
+    chapter_id: z.string(),
+    base_url: z.string(),
+    hash: z.string(),
     pages: z.array(
         z.object({
-            url: z.string(),
-            width: z.number(),
-            height: z.number(),
             page_number: z.number(),
+            filename: z.string(),
+            url: z.string(),
+            url_data_saver: z.string(),
         })
     ),
 });
 
 export const chapterNavigationSchema = z.object({
-    previous: z
-        .object({
-            mangadex_id: z.string(),
-            chapter_number: z.string().nullable(),
-        })
-        .nullable(),
-    next: z
-        .object({
-            mangadex_id: z.string(),
-            chapter_number: z.string().nullable(),
-        })
-        .nullable(),
+    prev_chapter_id: z.string().nullable(),
+    next_chapter_id: z.string().nullable(),
+    current_chapter_id: z.string(),
 });
 
 export type Chapter = z.infer<typeof chapterSchema>;

@@ -153,14 +153,6 @@ export default function MangaDetailsPage() {
                                 )}
                             </Button>
                         </ProtectedAction>
-                        {sortedChapters.length > 0 && (
-                            <Button asChild variant="outline" size="sm" className="gap-2">
-                                <Link href={`/manga/${mangaId}/chapters/${sortedChapters[0].mangadex_id}`}>
-                                    <BookOpen className="h-4 w-4" />
-                                    Start Reading
-                                </Link>
-                            </Button>
-                        )}
                     </div>
 
                     {manga.description && (
@@ -216,10 +208,9 @@ export default function MangaDetailsPage() {
                 ) : (
                     <div className="space-y-2">
                         {sortedChapters.map((chapter) => (
-                            <Link
+                            <div
                                 key={chapter.mangadex_id}
-                                href={`/manga/${mangaId}/chapters/${chapter.mangadex_id}`}
-                                className="flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-accent transition-colors group"
+                                className="flex items-center justify-between p-4 rounded-lg border bg-card"
                             >
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 mb-1">
@@ -249,8 +240,7 @@ export default function MangaDetailsPage() {
                                         )}
                                     </div>
                                 </div>
-                                <BookOpen className="h-5 w-5 text-muted-foreground group-hover:text-foreground transition-colors shrink-0 ml-4" />
-                            </Link>
+                            </div>
                         ))}
                         {isFetchingNextPage && (
                             <div className="space-y-2">

@@ -434,6 +434,50 @@ impl MangaDexClient {
             .await
     }
 
+    pub async fn report_image_load(
+        &self,
+        chapter_id: &str,
+        success: bool,
+    ) -> Result<(), MangaDexError> {
+        let url = format!("{}/at-home/server/{}/report", self.base_url, chapter_id);
+
+        let body = serde_json::json!({
+            "url": "",
+            "success": success,
+        });
+
+        if let Err(e) = self.ensure_authenticated().await {
+            return Err(e);
+        }
+
+        while self.rate_limiter.check().is_err() {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+
+        let access_token = {
+            let tokens = self.tokens.lock().await;
+            tokens.as_ref().map(|t| t.access_token.clone())
+        };
+
+        let mut request = self
+            .http
+            .post(&url)
+            .header(
+                "User-Agent",
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            )
+            .header("Content-Type", "application/json")
+            .json(&body);
+
+        if let Some(token) = access_token {
+            request = request.header("Authorization", format!("Bearer {}", token));
+        }
+
+        let _ = request.send().await.ok();
+
+        Ok(())
+    }
+
     pub fn get_cover_url(&self, manga_id: &str, cover_filename: &str) -> String {
         format!("{}/covers/{}/{}", self.base_url, manga_id, cover_filename)
     }

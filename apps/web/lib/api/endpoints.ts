@@ -17,22 +17,9 @@ export const ENDPOINTS = {
         CHAPTERS: (id: string) => `/manga/${id}/chapters`,
     },
 
-    // Chapters
-    CHAPTERS: {
-        PAGES: (id: string) => `/chapters/${id}/pages`,
-        NAVIGATION: (id: string) => `/chapters/${id}/navigation`,
-    },
-
     // User
     USER: {
         ME: '/users/me',
-        LIBRARY: '/users/me/library',
-        BOOKMARKS: '/users/me/bookmarks',
-        BOOKMARK: (mangaId: string) => `/users/me/bookmarks/${mangaId}`,
-        PROGRESS: '/users/me/progress',
-        MANGA_PROGRESS: (mangaId: string) => `/users/me/progress/${mangaId}`,
-        HISTORY: '/users/me/history',
-        MARK_READ: (chapterId: string) => `/users/me/history/${chapterId}`,
     },
 
     // Proxy

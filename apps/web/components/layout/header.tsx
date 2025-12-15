@@ -1,8 +1,10 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, FormEvent } from 'react';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/use-auth';
 import { useAuthModalStore } from '@/stores/auth-modal-store';
@@ -31,26 +33,35 @@ export function Header() {
 
     return (
         <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
-            <div className="container flex h-14 items-center justify-between px-4">
+            <div className="flex h-14 items-center justify-between pl-4 pr-2">
                 <Link href="/" className="flex items-center space-x-2">
-                    <span className="text-xl font-bold">Denshikawa</span>
+                    <Image
+                        src="/denshi-logo.png"
+                        alt="Denshikawa"
+                        width={32}
+                        height={32}
+                        className="h-16 w-38 rounded"
+                        priority
+                    />
                 </Link>
 
-
-                <form onSubmit={handleSearch} className="hidden md:flex flex-1 max-w-md mx-4">
-                    <div className="relative w-full">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <input
-                            type="search"
-                            placeholder="Search manga..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                        />
-                    </div>
-                </form>
-
                 <div className="flex items-center gap-2">
+                    <form
+                        onSubmit={handleSearch}
+                        className="hidden md:block"
+                    >
+                        <div className="relative w-64">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <input
+                                type="search"
+                                placeholder="Search manga..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                            />
+                        </div>
+                    </form>
+
                     <Button
                         variant="ghost"
                         size="icon"
@@ -60,6 +71,8 @@ export function Header() {
                     >
                         <Search className="h-5 w-5" />
                     </Button>
+
+                    <ThemeToggle />
 
                     {isAuthenticated ? (
                         <DropdownMenu>
@@ -76,13 +89,6 @@ export function Header() {
                                         <p className="text-xs text-muted-foreground">{user?.email}</p>
                                     </div>
                                 </DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem asChild>
-                                    <Link href="/library">My Library</Link>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem asChild>
-                                    <Link href="/history">Reading History</Link>
-                                </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem onClick={() => logout()}>
                                     <LogOut className="mr-2 h-4 w-4" />
