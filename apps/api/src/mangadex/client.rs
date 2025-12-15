@@ -398,6 +398,19 @@ impl MangaDexClient {
         Ok(response.data)
     }
 
+    pub async fn get_random_manga(&self) -> Result<MangaDexManga, MangaDexError> {
+        let url = format!(
+            "{}/manga/random?includes[]=cover_art&includes[]=author&includes[]=artist&includes[]=tag",
+            self.base_url
+        );
+
+        let response: MangaDexResponse<MangaDexManga> = self
+            .request_with_retry(|| async { self.get_json(&url).await })
+            .await?;
+
+        Ok(response.data)
+    }
+
     pub async fn get_chapters(
         &self,
         manga_id: &str,

@@ -8,7 +8,8 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/use-auth';
 import { useAuthModalStore } from '@/stores/auth-modal-store';
-import { Search, User, LogOut } from 'lucide-react';
+import { mangaApi } from '@/lib/api/manga';
+import { Loader2, Search, Shuffle, User, LogOut } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -23,11 +24,26 @@ export function Header() {
     const { open: openAuthModal } = useAuthModalStore();
     const router = useRouter();
     const [searchQuery, setSearchQuery] = useState('');
+    const [isRandomLoading, setIsRandomLoading] = useState(false);
 
     const handleSearch = (e: FormEvent) => {
         e.preventDefault();
         if (searchQuery.trim()) {
             router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+        }
+    };
+
+    const handleRandom = async () => {
+        try {
+            setIsRandomLoading(true);
+            const { id } = await mangaApi.getRandom();
+            if (id) {
+                router.push(`/manga/${id}`);
+            }
+        } catch (error) {
+            console.error('Failed to fetch random manga', error);
+        } finally {
+            setIsRandomLoading(false);
         }
     };
 
@@ -46,6 +62,25 @@ export function Header() {
                 </Link>
 
                 <div className="flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="hidden md:inline-flex gap-2"
+                        onClick={handleRandom}
+                        disabled={isRandomLoading}
+                    >
+                        {isRandomLoading ? (
+                            <>
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Random
+                            </>
+                        ) : (
+                            <>
+                                <Shuffle className="h-4 w-4" />
+                                Random
+                            </>
+                        )}
+                    </Button>
                     <form
                         onSubmit={handleSearch}
                         className="hidden md:block"

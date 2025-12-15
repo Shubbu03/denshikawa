@@ -30,6 +30,11 @@ export const mangaApi = {
         return mangaSearchSchema.parse(data);
     },
 
+    getRandom: async () => {
+        const { data } = await apiClient.get<{ id: string }>(ENDPOINTS.MANGA.RANDOM);
+        return data;
+    },
+
     getDetails: async (id: string) => {
         const { data } = await apiClient.get<MangaDetails>(ENDPOINTS.MANGA.DETAILS(id));
         return mangaDetailsSchema.parse(data);

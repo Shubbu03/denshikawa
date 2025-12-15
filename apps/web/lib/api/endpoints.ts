@@ -13,6 +13,7 @@ export const ENDPOINTS = {
         SEARCH: '/manga/search',
         POPULAR: '/manga/popular',
         LATEST: '/manga/latest',
+        RANDOM: '/manga/random',
         DETAILS: (id: string) => `/manga/${id}`,
         CHAPTERS: (id: string) => `/manga/${id}/chapters`,
     },

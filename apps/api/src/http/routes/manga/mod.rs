@@ -2,6 +2,7 @@ pub mod chapters;
 pub mod get_manga;
 pub mod latest;
 pub mod popular;
+pub mod random;
 pub mod search;
 
 use axum::{routing::get, Router};
@@ -13,6 +14,7 @@ pub fn manga_routes() -> Router<AppState> {
         .route("/search", get(search::search_manga))
         .route("/popular", get(popular::get_popular_manga))
         .route("/latest", get(latest::get_latest_manga))
+        .route("/random", get(random::get_random_manga))
         .route("/{id}", get(get_manga::get_manga))
         .route("/{id}/chapters", get(chapters::get_chapters))
 }
