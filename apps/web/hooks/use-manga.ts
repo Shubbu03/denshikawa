@@ -47,9 +47,9 @@ export const useMangaDetails = (id: string) => {
     });
 };
 
-export const useMangaChapters = (id: string, lang = 'en') => {
+export const useMangaChapters = (id: string, lang: string | null = null) => {
     return useInfiniteQuery({
-        queryKey: queryKeys.manga.chapters(id, lang),
+        queryKey: queryKeys.manga.chapters(id, lang || 'all'),
         queryFn: ({ pageParam = 0 }) => mangaApi.getChapters(id, lang, 100, pageParam),
         getNextPageParam: (lastPage) => {
             const nextOffset = lastPage.offset + lastPage.limit;
@@ -57,6 +57,14 @@ export const useMangaChapters = (id: string, lang = 'en') => {
         },
         enabled: !!id,
         initialPageParam: 0,
+    });
+};
+
+export const useMangaAggregate = (id: string, lang: string | null = null) => {
+    return useQuery({
+        queryKey: queryKeys.manga.aggregate(id, lang || 'all'),
+        queryFn: () => mangaApi.getAggregate(id, lang),
+        enabled: !!id,
     });
 };
 

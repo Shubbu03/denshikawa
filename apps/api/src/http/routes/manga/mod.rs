@@ -1,3 +1,4 @@
+pub mod aggregate;
 pub mod chapters;
 pub mod get_manga;
 pub mod latest;
@@ -17,4 +18,5 @@ pub fn manga_routes() -> Router<AppState> {
         .route("/random", get(random::get_random_manga))
         .route("/{id}", get(get_manga::get_manga))
         .route("/{id}/chapters", get(chapters::get_chapters))
+        .route("/{id}/aggregate", get(aggregate::get_manga_aggregate))
 }

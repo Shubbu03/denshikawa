@@ -72,19 +72,29 @@ pub async fn get_manga_with_cache(
 
 pub async fn get_chapters_with_cache(
     manga_mangadex_id: &str,
-    lang: &str,
+    lang: Option<&str>,
     db: &PgPool,
     client: &MangaDexClient,
     config: &MangaDexConfig,
 ) -> Result<Vec<Chapter>, MangaDexError> {
-    let cached = sqlx::query_as::<_, ChapterCache>(
-        "SELECT id, mangadex_id, manga_mangadex_id, chapter_number, volume, title, language, scanlation_group_id, scanlation_group_name, page_count, published_at, cached_at FROM chapter_cache WHERE manga_mangadex_id = $1 AND language = $2 ORDER BY chapter_number::numeric"
-    )
-    .bind(manga_mangadex_id)
-    .bind(lang)
-    .fetch_all(db)
-    .await
-    .map_err(|e| MangaDexError::Internal(anyhow::anyhow!("Database error: {}", e)))?;
+    let cached = if let Some(l) = lang {
+        sqlx::query_as::<_, ChapterCache>(
+            "SELECT id, mangadex_id, manga_mangadex_id, chapter_number, volume, title, language, scanlation_group_id, scanlation_group_name, page_count, published_at, cached_at FROM chapter_cache WHERE manga_mangadex_id = $1 AND language = $2 ORDER BY chapter_number::numeric"
+        )
+        .bind(manga_mangadex_id)
+        .bind(l)
+        .fetch_all(db)
+        .await
+        .map_err(|e| MangaDexError::Internal(anyhow::anyhow!("Database error: {}", e)))?
+    } else {
+        sqlx::query_as::<_, ChapterCache>(
+            "SELECT id, mangadex_id, manga_mangadex_id, chapter_number, volume, title, language, scanlation_group_id, scanlation_group_name, page_count, published_at, cached_at FROM chapter_cache WHERE manga_mangadex_id = $1 ORDER BY chapter_number::numeric"
+        )
+        .bind(manga_mangadex_id)
+        .fetch_all(db)
+        .await
+        .map_err(|e| MangaDexError::Internal(anyhow::anyhow!("Database error: {}", e)))?
+    };
 
     if !cached.is_empty() {
         let oldest_cache = cached.iter().map(|c| c.cached_at).min().unwrap();

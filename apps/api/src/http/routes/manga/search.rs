@@ -5,6 +5,7 @@ use axum::{
 use serde::Deserialize;
 
 use crate::mangadex::MangaDexError;
+use crate::manga::Manga;
 use crate::AppState;
 
 #[derive(Debug, Deserialize)]
@@ -22,19 +23,10 @@ fn default_limit() -> u32 {
 
 #[derive(serde::Serialize)]
 pub struct SearchResponse {
-    pub data: Vec<MangaSummary>,
+    pub data: Vec<Manga>,
     pub total: u32,
     pub limit: u32,
     pub offset: u32,
-}
-
-#[derive(serde::Serialize)]
-pub struct MangaSummary {
-    pub id: String,
-    pub mangadex_id: String,
-    pub title: String,
-    pub cover_url: String,
-    pub status: String,
 }
 
 pub async fn search_manga(
@@ -48,50 +40,16 @@ pub async fn search_manga(
         .search_manga(&params.q, limit, params.offset)
         .await?;
 
-    let summaries: Vec<MangaSummary> = response
+    let manga: Vec<Manga> = response
         .data
         .into_iter()
-        .filter_map(|m| {
-            let attrs = &m.attributes;
-            let title = attrs
-                .title
-                .en
-                .clone()
-                .or_else(|| attrs.title.ja.clone())
-                .or_else(|| {
-                    attrs
-                        .title
-                        .other
-                        .values()
-                        .find_map(|v| v.as_str().map(|s| s.to_string()))
-                })
-                .unwrap_or_else(|| "Untitled".to_string());
-
-            let cover_url = m
-                .relationships
-                .iter()
-                .find(|r| r.rel_type == "cover_art")
-                .and_then(|r| r.attributes.as_ref())
-                .and_then(|a| a.file_name.as_ref())
-                .map(|filename| {
-                    format!("https://uploads.mangadex.org/covers/{}/{}", m.id, filename)
-                })
-                .unwrap_or_default();
-
-            Some(MangaSummary {
-                id: m.id.clone(),
-                mangadex_id: m.id,
-                title,
-                cover_url,
-                status: attrs.status.clone(),
-            })
-        })
+        .filter_map(|m| Manga::try_from(m).ok())
         .collect();
 
     Ok(Json(SearchResponse {
-        total: response.total.unwrap_or(summaries.len() as u32),
+        total: response.total.unwrap_or(manga.len() as u32),
         limit,
         offset: params.offset,
-        data: summaries,
+        data: manga,
     }))
 }

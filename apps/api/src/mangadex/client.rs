@@ -342,7 +342,7 @@ impl MangaDexClient {
         offset: u32,
     ) -> Result<MangaDexResponse<Vec<MangaDexManga>>, MangaDexError> {
         let url = format!(
-            "{}/manga?title={}&limit={}&offset={}&includes[]=cover_art&includes[]=author&includes[]=artist",
+            "{}/manga?title={}&limit={}&offset={}&availableTranslatedLanguage[]=en&includes[]=cover_art&includes[]=author&includes[]=artist&includes[]=tag",
             self.base_url,
             urlencoding::encode(query),
             limit,
@@ -359,7 +359,7 @@ impl MangaDexClient {
         offset: u32,
     ) -> Result<MangaDexResponse<Vec<MangaDexManga>>, MangaDexError> {
         let url = format!(
-            "{}/manga?order[followedCount]=desc&limit={}&offset={}&includes[]=cover_art&includes[]=author&includes[]=artist",
+            "{}/manga?order[followedCount]=desc&limit={}&offset={}&availableTranslatedLanguage[]=en&includes[]=cover_art&includes[]=author&includes[]=artist&includes[]=tag&contentRating[]=safe&contentRating[]=suggestive",
             self.base_url,
             limit,
             offset
@@ -375,7 +375,7 @@ impl MangaDexClient {
         offset: u32,
     ) -> Result<MangaDexResponse<Vec<MangaDexManga>>, MangaDexError> {
         let url = format!(
-            "{}/manga?order[latestUploadedChapter]=desc&limit={}&offset={}&includes[]=cover_art&includes[]=author&includes[]=artist",
+            "{}/manga?order[latestUploadedChapter]=desc&limit={}&offset={}&availableTranslatedLanguage[]=en&includes[]=cover_art&includes[]=author&includes[]=artist&includes[]=tag&contentRating[]=safe&contentRating[]=suggestive",
             self.base_url,
             limit,
             offset
@@ -400,7 +400,7 @@ impl MangaDexClient {
 
     pub async fn get_random_manga(&self) -> Result<MangaDexManga, MangaDexError> {
         let url = format!(
-            "{}/manga/random?includes[]=cover_art&includes[]=author&includes[]=artist&includes[]=tag",
+            "{}/manga/random?includes[]=cover_art&includes[]=author&includes[]=artist&includes[]=tag&contentRating[]=safe&contentRating[]=suggestive",
             self.base_url
         );
 
@@ -414,14 +414,49 @@ impl MangaDexClient {
     pub async fn get_chapters(
         &self,
         manga_id: &str,
-        lang: &str,
+        lang: Option<&str>,
         limit: u32,
         offset: u32,
     ) -> Result<MangaDexResponse<Vec<MangaDexChapter>>, MangaDexError> {
+        let lang_param = if let Some(l) = lang {
+            if l.is_empty() {
+                String::new()
+            } else {
+                format!("&translatedLanguage[]={}", urlencoding::encode(l))
+            }
+        } else {
+            String::new()
+        };
+
         let url = format!(
-            "{}/manga/{}/feed?translatedLanguage[]={}&limit={}&offset={}&includes[]=scanlation_group&order[chapter]=asc",
-            self.base_url, manga_id, lang, limit, offset
+            "{}/manga/{}/feed?limit={}&offset={}&includes[]=scanlation_group&order[volume]=asc&order[chapter]=asc{}",
+            self.base_url, manga_id, limit, offset, lang_param
         );
+
+        self.request_with_retry(|| async { self.get_json(&url).await })
+            .await
+    }
+
+    pub async fn get_manga_aggregate(
+        &self,
+        manga_id: &str,
+        lang: Option<&str>,
+    ) -> Result<serde_json::Value, MangaDexError> {
+        let lang_param = if let Some(l) = lang {
+            if l.is_empty() {
+                String::new()
+            } else {
+                format!("translatedLanguage[]={}", urlencoding::encode(l))
+            }
+        } else {
+            String::new()
+        };
+
+        let url = if lang_param.is_empty() {
+            format!("{}/manga/{}/aggregate", self.base_url, manga_id)
+        } else {
+            format!("{}/manga/{}/aggregate?{}", self.base_url, manga_id, lang_param)
+        };
 
         self.request_with_retry(|| async { self.get_json(&url).await })
             .await
@@ -492,6 +527,8 @@ impl MangaDexClient {
     }
 
     pub fn get_cover_url(&self, manga_id: &str, cover_filename: &str) -> String {
-        format!("{}/covers/{}/{}", self.base_url, manga_id, cover_filename)
+        // Use .256.jpg suffix for optimized thumbnail loading
+        // For higher quality, use .512.jpg or remove suffix for original
+        format!("{}/covers/{}/{}.256.jpg", self.base_url, manga_id, cover_filename)
     }
 }

@@ -65,7 +65,7 @@ export function Header() {
                     <Button
                         variant="outline"
                         size="sm"
-                        className="hidden md:inline-flex gap-2"
+                        className="hidden md:inline-flex gap-2 cursor-pointer"
                         onClick={handleRandom}
                         disabled={isRandomLoading}
                     >
@@ -112,7 +112,7 @@ export function Header() {
                     {isAuthenticated ? (
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="relative">
+                                <Button variant="ghost" size="icon" className="relative cursor-pointer">
                                     <User className="h-5 w-5" />
                                     <span className="sr-only">User menu</span>
                                 </Button>
@@ -136,7 +136,7 @@ export function Header() {
                             onClick={() => openAuthModal('login')}
                             variant="default"
                             size="sm"
-                            className="gap-2"
+                            className="gap-2 cursor-pointer"
                         >
                             <User className="h-4 w-4" />
                             <span className="hidden sm:inline">Sign in</span>

@@ -10,16 +10,12 @@ use crate::AppState;
 
 #[derive(Debug, Deserialize)]
 pub struct ChaptersQuery {
-    #[serde(default = "default_lang")]
-    pub lang: String,
+    #[serde(default)]
+    pub lang: Option<String>,
     #[serde(default = "default_limit")]
     pub limit: u32,
     #[serde(default)]
     pub offset: u32,
-}
-
-fn default_lang() -> String {
-    "en".to_string()
 }
 
 fn default_limit() -> u32 {
@@ -41,43 +37,66 @@ pub async fn get_chapters(
 ) -> Result<Json<ChaptersResponse>, MangaDexError> {
     let limit = params.limit.min(500); // Max 500 per request
 
-    // Get cached chapters with pagination
-    let cached = sqlx::query_as::<_, ChapterCache>(
-        r#"SELECT id, mangadex_id, manga_mangadex_id, chapter_number, volume, title, language, scanlation_group_id, scanlation_group_name, page_count, published_at, cached_at FROM chapter_cache WHERE manga_mangadex_id = $1 AND language = $2 ORDER BY (CASE WHEN chapter_number ~ '^[0-9]+\.?[0-9]*$' THEN chapter_number::numeric ELSE 0 END) DESC, chapter_number DESC LIMIT $3 OFFSET $4"#
-    )
-    .bind(&mangadex_id)
-    .bind(&params.lang)
-    .bind(limit as i64)
-    .bind(params.offset as i64)
-    .fetch_all(&state.db_pool)
-    .await
-    .map_err(|e| MangaDexError::Internal(anyhow::anyhow!("Database error: {}", e)))?;
+    // Get cached chapters with pagination (filter by language if provided)
+    let (cached, total) = if let Some(ref lang) = params.lang {
+        let cached_chapters = sqlx::query_as::<_, ChapterCache>(
+            r#"SELECT id, mangadex_id, manga_mangadex_id, chapter_number, volume, title, language, scanlation_group_id, scanlation_group_name, page_count, published_at, cached_at FROM chapter_cache WHERE manga_mangadex_id = $1 AND language = $2 ORDER BY (CASE WHEN chapter_number ~ '^[0-9]+\.?[0-9]*$' THEN chapter_number::numeric ELSE 0 END) DESC, chapter_number DESC LIMIT $3 OFFSET $4"#
+        )
+        .bind(&mangadex_id)
+        .bind(lang)
+        .bind(limit as i64)
+        .bind(params.offset as i64)
+        .fetch_all(&state.db_pool)
+        .await
+        .map_err(|e| MangaDexError::Internal(anyhow::anyhow!("Database error: {}", e)))?;
 
-    // Get total count
-    let total: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM chapter_cache WHERE manga_mangadex_id = $1 AND language = $2"
-    )
-    .bind(&mangadex_id)
-    .bind(&params.lang)
-    .fetch_one(&state.db_pool)
-    .await
-    .map_err(|e| MangaDexError::Internal(anyhow::anyhow!("Database error: {}", e)))?;
+        let total: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM chapter_cache WHERE manga_mangadex_id = $1 AND language = $2"
+        )
+        .bind(&mangadex_id)
+        .bind(lang)
+        .fetch_one(&state.db_pool)
+        .await
+        .map_err(|e| MangaDexError::Internal(anyhow::anyhow!("Database error: {}", e)))?;
+
+        (cached_chapters, total)
+    } else {
+        // No language filter - get all languages
+        let cached_chapters = sqlx::query_as::<_, ChapterCache>(
+            r#"SELECT id, mangadex_id, manga_mangadex_id, chapter_number, volume, title, language, scanlation_group_id, scanlation_group_name, page_count, published_at, cached_at FROM chapter_cache WHERE manga_mangadex_id = $1 ORDER BY (CASE WHEN chapter_number ~ '^[0-9]+\.?[0-9]*$' THEN chapter_number::numeric ELSE 0 END) DESC, chapter_number DESC LIMIT $2 OFFSET $3"#
+        )
+        .bind(&mangadex_id)
+        .bind(limit as i64)
+        .bind(params.offset as i64)
+        .fetch_all(&state.db_pool)
+        .await
+        .map_err(|e| MangaDexError::Internal(anyhow::anyhow!("Database error: {}", e)))?;
+
+        let total: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM chapter_cache WHERE manga_mangadex_id = $1"
+        )
+        .bind(&mangadex_id)
+        .fetch_one(&state.db_pool)
+        .await
+        .map_err(|e| MangaDexError::Internal(anyhow::anyhow!("Database error: {}", e)))?;
+
+        (cached_chapters, total)
+    };
 
     let chapters: Vec<crate::manga::Chapter> = cached.into_iter().map(|c| c.into()).collect();
 
-    // If cache is empty or we need more chapters than cached, fetch from MangaDex
     if chapters.is_empty() || (total == 0) || (params.offset + limit > total as u32) {
         // Fetch all chapters from MangaDex and cache them
+        let lang_ref = params.lang.as_deref();
         let all_chapters = get_chapters_with_cache(
             &mangadex_id,
-            &params.lang,
+            lang_ref,
             &state.db_pool,
             &state.mangadex_client,
             &state.mangadex_config,
         )
         .await?;
 
-        // Sort chapters by chapter number (descending - newest first)
         let mut sorted_chapters = all_chapters;
         sorted_chapters.sort_by(|a, b| {
             let num_a = a.chapter_number.as_ref()
@@ -89,7 +108,6 @@ pub async fn get_chapters(
             num_b.partial_cmp(&num_a).unwrap_or(std::cmp::Ordering::Equal)
         });
 
-        // Apply pagination
         let total = sorted_chapters.len() as u32;
         let start = params.offset as usize;
         let end = (start + limit as usize).min(sorted_chapters.len());

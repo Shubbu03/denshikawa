@@ -16,6 +16,7 @@ export const ENDPOINTS = {
         RANDOM: '/manga/random',
         DETAILS: (id: string) => `/manga/${id}`,
         CHAPTERS: (id: string) => `/manga/${id}/chapters`,
+        AGGREGATE: (id: string) => `/manga/${id}/aggregate`,
     },
 
     // User

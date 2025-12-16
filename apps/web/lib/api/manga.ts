@@ -40,11 +40,26 @@ export const mangaApi = {
         return mangaDetailsSchema.parse(data);
     },
 
-    getChapters: async (id: string, lang = 'en', limit = 100, offset = 0) => {
+    getChapters: async (id: string, lang: string | null = null, limit = 100, offset = 0) => {
+        const params: Record<string, any> = { limit, offset };
+        if (lang) {
+            params.lang = lang;
+        }
         const { data } = await apiClient.get<ChapterListResponse>(ENDPOINTS.MANGA.CHAPTERS(id), {
-            params: { lang, limit, offset },
+            params,
         });
         return chapterListResponseSchema.parse(data);
+    },
+
+    getAggregate: async (id: string, lang: string | null = null) => {
+        const params: Record<string, any> = {};
+        if (lang) {
+            params.lang = lang;
+        }
+        const { data } = await apiClient.get(ENDPOINTS.MANGA.AGGREGATE(id), {
+            params,
+        });
+        return data;
     },
 };
 

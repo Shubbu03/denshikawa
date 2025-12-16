@@ -56,7 +56,6 @@ function SearchContent() {
                 </div>
             </form>
 
-            {/* Results */}
             {debouncedQuery.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                     <SearchIcon className="h-12 w-12 text-muted-foreground mb-4" />
@@ -83,7 +82,7 @@ function SearchContent() {
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                         {allManga.map((manga, index) => (
-                            <MangaCard key={manga.id} manga={manga} priority={index < 12} />
+                            <MangaCard key={manga.mangadex_id} manga={manga} priority={index < 12} />
                         ))}
                         {isFetchingNextPage && (
                             <>

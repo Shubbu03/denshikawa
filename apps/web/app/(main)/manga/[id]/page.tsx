@@ -1,23 +1,31 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useMangaDetails, useMangaChapters } from '@/hooks/use-manga';
 import { MangaCardSkeleton } from '@/components/manga/manga-card-skeleton';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, BookOpen, Calendar, Users, Tag, Bookmark, BookmarkCheck } from 'lucide-react';
+import { Loader2, BookOpen, Calendar, Users, Tag, Bookmark, BookmarkCheck, Languages } from 'lucide-react';
 import Link from 'next/link';
 import { ProtectedAction } from '@/components/shared/protected-action';
 import { useAuth } from '@/hooks/use-auth';
 import Image from 'next/image';
 import { formatDate } from '@/lib/utils/format';
+import { getLanguageName } from '@/lib/utils/languages';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 export default function MangaDetailsPage() {
     const params = useParams();
     const mangaId = params.id as string;
     const { isAuthenticated } = useAuth();
+    const [selectedLanguage, setSelectedLanguage] = useState<string | null>(null);
 
     const { data: manga, isLoading: isLoadingManga } = useMangaDetails(mangaId);
     const {
@@ -26,7 +34,7 @@ export default function MangaDetailsPage() {
         hasNextPage,
         isFetchingNextPage,
         isLoading: isLoadingChapters,
-    } = useMangaChapters(mangaId, 'en');
+    } = useMangaChapters(mangaId, selectedLanguage);
 
     const sortedChapters = useMemo(() => {
         const allChapters = chaptersData?.pages.flatMap((page) => page.data) ?? [];
@@ -35,6 +43,12 @@ export default function MangaDetailsPage() {
             const numB = b.chapter_number ? parseFloat(b.chapter_number) : 0;
             return numB - numA;
         });
+    }, [chaptersData]);
+
+    const availableLanguages = useMemo(() => {
+        const allChapters = chaptersData?.pages.flatMap((page) => page.data) ?? [];
+        const languages = new Set(allChapters.map((ch) => ch.language));
+        return Array.from(languages).sort();
     }, [chaptersData]);
 
     if (isLoadingManga) {
@@ -182,16 +196,45 @@ export default function MangaDetailsPage() {
             <Separator />
 
             <div className="space-y-4">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-wrap gap-4">
                     <h2 className="text-2xl font-semibold">Chapters</h2>
-                    {chaptersData && sortedChapters.length > 0 && (
-                        <p className="text-sm text-muted-foreground">
-                            {chaptersData.pages[0]?.total ?? sortedChapters.length} chapter{(chaptersData.pages[0]?.total ?? sortedChapters.length) !== 1 ? 's' : ''}
-                            {sortedChapters.length < (chaptersData.pages[0]?.total ?? 0) && (
-                                <span className="ml-1">({sortedChapters.length} loaded)</span>
-                            )}
-                        </p>
-                    )}
+                    <div className="flex items-center gap-4">
+                        {availableLanguages.length > 0 && (
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" size="sm" className="gap-2">
+                                        <Languages className="h-4 w-4" />
+                                        {selectedLanguage ? getLanguageName(selectedLanguage) : 'All Languages'}
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-[200px]">
+                                    <DropdownMenuItem
+                                        onClick={() => setSelectedLanguage(null)}
+                                        className={!selectedLanguage ? 'bg-accent' : ''}
+                                    >
+                                        All Languages
+                                    </DropdownMenuItem>
+                                    {availableLanguages.map((lang) => (
+                                        <DropdownMenuItem
+                                            key={lang}
+                                            onClick={() => setSelectedLanguage(lang)}
+                                            className={selectedLanguage === lang ? 'bg-accent' : ''}
+                                        >
+                                            {getLanguageName(lang)}
+                                        </DropdownMenuItem>
+                                    ))}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        )}
+                        {chaptersData && sortedChapters.length > 0 && (
+                            <p className="text-sm text-muted-foreground">
+                                {chaptersData.pages[0]?.total ?? sortedChapters.length} chapter{(chaptersData.pages[0]?.total ?? sortedChapters.length) !== 1 ? 's' : ''}
+                                {sortedChapters.length < (chaptersData.pages[0]?.total ?? 0) && (
+                                    <span className="ml-1">({sortedChapters.length} loaded)</span>
+                                )}
+                            </p>
+                        )}
+                    </div>
                 </div>
 
                 {isLoadingChapters ? (
@@ -208,12 +251,13 @@ export default function MangaDetailsPage() {
                 ) : (
                     <div className="space-y-2">
                         {sortedChapters.map((chapter) => (
-                            <div
+                            <Link
                                 key={chapter.mangadex_id}
-                                className="flex items-center justify-between p-4 rounded-lg border bg-card"
+                                href={`/manga/${mangaId}/chapter/${chapter.mangadex_id}`}
+                                className="flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-accent transition-colors cursor-pointer"
                             >
                                 <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 mb-1">
+                                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                                         <span className="font-medium">
                                             {chapter.chapter_number
                                                 ? `Chapter ${chapter.chapter_number}`
@@ -224,6 +268,9 @@ export default function MangaDetailsPage() {
                                                 Vol. {chapter.volume}
                                             </Badge>
                                         )}
+                                        <Badge variant="secondary" className="text-xs">
+                                            {getLanguageName(chapter.language)}
+                                        </Badge>
                                     </div>
                                     {chapter.title && (
                                         <p className="text-sm text-muted-foreground truncate">{chapter.title}</p>
@@ -240,7 +287,7 @@ export default function MangaDetailsPage() {
                                         )}
                                     </div>
                                 </div>
-                            </div>
+                            </Link>
                         ))}
                         {isFetchingNextPage && (
                             <div className="space-y-2">

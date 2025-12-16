@@ -90,10 +90,22 @@ impl TryFrom<MangaDexManga> for Manga {
     fn try_from(mangadex: MangaDexManga) -> Result<Self, Self::Error> {
         let attrs = &mangadex.attributes;
 
+        // Priority: title.en -> altTitles.en -> title.ja-ro (romaji) -> title.ja -> first available
         let title = attrs
             .title
             .en
             .clone()
+            .or_else(|| {
+                attrs.alt_titles.iter().find_map(|alt| alt.en.clone())
+            })
+            .or_else(|| {
+                // romaji
+                attrs
+                    .title
+                    .other
+                    .get("ja-ro")
+                    .and_then(|v| v.as_str().map(|s| s.to_string()))
+            })
             .or_else(|| attrs.title.ja.clone())
             .or_else(|| {
                 attrs
@@ -126,7 +138,7 @@ impl TryFrom<MangaDexManga> for Manga {
             .and_then(|a| a.file_name.as_ref())
             .map(|filename| {
                 format!(
-                    "https://uploads.mangadex.org/covers/{}/{}",
+                    "https://uploads.mangadex.org/covers/{}/{}.256.jpg",
                     mangadex.id, filename
                 )
             })
