@@ -41,9 +41,24 @@ export const chapterNavigationSchema = z.object({
     current_chapter_id: z.string(),
 });
 
+export const chapterPagesResponseSchema = z.object({
+    chapter_id: z.string(),
+    base_url: z.string(),
+    hash: z.string(),
+    pages: z.array(
+        z.object({
+            page_number: z.number(),
+            filename: z.string(),
+            url: z.string(),
+            url_data_saver: z.string(),
+        })
+    ),
+});
+
 export type Chapter = z.infer<typeof chapterSchema>;
 export type ChapterList = z.infer<typeof chapterListSchema>;
 export type ChapterListResponse = z.infer<typeof chapterListResponseSchema>;
 export type ChapterPages = z.infer<typeof chapterPagesSchema>;
+export type ChapterPagesResponse = z.infer<typeof chapterPagesResponseSchema>;
 export type ChapterNavigation = z.infer<typeof chapterNavigationSchema>;
 

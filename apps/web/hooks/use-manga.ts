@@ -68,3 +68,11 @@ export const useMangaAggregate = (id: string, lang: string | null = null) => {
     });
 };
 
+export const useChapterPages = (chapterId: string) => {
+    return useQuery({
+        queryKey: queryKeys.manga.chapterPages(chapterId),
+        queryFn: () => mangaApi.getChapterPages(chapterId),
+        enabled: !!chapterId,
+    });
+};
+

@@ -6,7 +6,7 @@ import {
     mangaSearchSchema,
     mangaDetailsSchema,
 } from '@/lib/schemas/manga';
-import { ChapterListResponse, chapterListResponseSchema } from '@/lib/schemas/chapter';
+import { ChapterListResponse, chapterListResponseSchema, ChapterPagesResponse, chapterPagesResponseSchema } from '@/lib/schemas/chapter';
 
 export const mangaApi = {
     search: async (query: string, limit = 20, offset = 0) => {
@@ -60,6 +60,11 @@ export const mangaApi = {
             params,
         });
         return data;
+    },
+
+    getChapterPages: async (chapterId: string) => {
+        const { data } = await apiClient.get<ChapterPagesResponse>(ENDPOINTS.MANGA.CHAPTER_PAGES(chapterId));
+        return chapterPagesResponseSchema.parse(data);
     },
 };
 

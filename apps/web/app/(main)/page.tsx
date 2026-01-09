@@ -17,7 +17,7 @@ export default function HomePage() {
                 </p>
             </div>
 
-            <PopularMangaSection />
+            {/* <PopularMangaSection /> */}
             <LatestMangaSection />
         </div>
     );

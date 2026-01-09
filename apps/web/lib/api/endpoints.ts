@@ -17,6 +17,7 @@ export const ENDPOINTS = {
         DETAILS: (id: string) => `/manga/${id}`,
         CHAPTERS: (id: string) => `/manga/${id}/chapters`,
         AGGREGATE: (id: string) => `/manga/${id}/aggregate`,
+        CHAPTER_PAGES: (chapterId: string) => `/manga/chapter/${chapterId}/pages`,
     },
 
     // User

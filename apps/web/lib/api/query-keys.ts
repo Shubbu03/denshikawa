@@ -7,6 +7,7 @@ export const queryKeys = {
         detail: (id: string) => [...queryKeys.manga.all, id] as const,
         chapters: (id: string, lang: string) => [...queryKeys.manga.all, id, 'chapters', lang] as const,
         aggregate: (id: string, lang: string) => [...queryKeys.manga.all, id, 'aggregate', lang] as const,
+        chapterPages: (chapterId: string) => [...queryKeys.manga.all, 'chapter', chapterId, 'pages'] as const,
     },
     user: {
         all: ['user'] as const,
